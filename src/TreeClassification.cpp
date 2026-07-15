@@ -671,6 +671,7 @@ bool TreeClassification::findBestSplitExtraTrees(size_t nodeID, std::vector<size
     split_stats[nodeID] = best_decrease;
   }
 
+// here is where gini index is calculated !
   // Compute gini index for this node and to variable importance if needed
   if (importance_mode == IMP_GINI || importance_mode == IMP_GINI_CORRECTED) {
     addGiniImportance(nodeID, best_varID, best_decrease);
