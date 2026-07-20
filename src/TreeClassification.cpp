@@ -241,7 +241,8 @@ bool TreeClassification::findBestSplit(size_t nodeID, std::vector<size_t>& possi
   if (save_node_stats) {
     split_stats[nodeID] = best_decrease;
   }
-
+  
+  // calling function to compute gini index
   // Compute gini index for this node and to variable importance if needed
   if (importance_mode == IMP_GINI || importance_mode == IMP_GINI_CORRECTED) {
     addGiniImportance(nodeID, best_varID, best_decrease);
@@ -1220,6 +1221,13 @@ void TreeClassification::findBestSplitValueNanLargeQ(size_t nodeID, size_t varID
   }
 }
 
+// func to compute gini index, after splitting?
+
+// 1. Considers a random subset of variables (mtry).
+// 2. For each candidate variable, considers possible split points.
+// 3. Computes the decrease in Gini impurity for each split.
+// 4. Chooses the split with the largest reduction in Gini impurity.
+
 void TreeClassification::addGiniImportance(size_t nodeID, size_t varID, double decrease) {
 
   double best_decrease = decrease;
@@ -1256,6 +1264,7 @@ void TreeClassification::addGiniImportance(size_t nodeID, size_t varID, double d
     (*variable_importance)[tempvarID] += best_decrease;
   }
 }
+// end gini function 
 
 void TreeClassification::bootstrapClassWise() {
   // Number of samples is sum of sample fraction * number of samples
