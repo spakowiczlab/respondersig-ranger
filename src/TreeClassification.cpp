@@ -151,9 +151,16 @@ double TreeClassification::computePredictionAccuracyInternal(std::vector<double>
   return (1.0 - (double) num_missclassifications / (double) num_predictions);
 }
 
+/*
+ * nodeID = which node we are currently working with, its an index 
+ * possible_split_varIDs = vector of ints, possible split indices
+ * The & means we are passing the original object, rather than a copy.
+ */
 bool TreeClassification::findBestSplit(size_t nodeID, std::vector<size_t>& possible_split_varIDs) {
 
+  // defining objects "type name = value"
   size_t num_samples_node = end_pos[nodeID] - start_pos[nodeID];
+  // -> is equivalent to class_values$size()
   size_t num_classes = class_values->size();
   double best_decrease = -1;
   size_t best_varID = 0;
@@ -176,7 +183,7 @@ bool TreeClassification::findBestSplit(size_t nodeID, std::vector<size_t>& possi
     }
   }
   
-  // Stop early if no split posssible
+  // Stop early if no split possible
   if (min_bucket->size() == 1) {
     if (num_samples_node < 2 * (*min_bucket)[0]) {
       return true;
@@ -253,7 +260,9 @@ bool TreeClassification::findBestSplit(size_t nodeID, std::vector<size_t>& possi
 
   return false;
 }
+// end findBestSplit function 
 
+// another find best split function? 
 void TreeClassification::findBestSplitValueSmallQ(size_t nodeID, size_t varID, size_t num_classes,
     const std::vector<size_t>& class_counts, size_t num_samples_node, double& best_value, size_t& best_varID,
     double& best_decrease) {
@@ -454,6 +463,7 @@ void TreeClassification::findBestSplitValueLargeQ(size_t nodeID, size_t varID, s
       }
 
       // Decrease of impurity
+      // this calculation needs edited...
       decrease = sum_right / (double) n_right + sum_left / (double) n_left;
     }
     
@@ -1223,10 +1233,9 @@ void TreeClassification::findBestSplitValueNanLargeQ(size_t nodeID, size_t varID
 
 // func to compute gini index, after splitting?
 
-// 1. Considers a random subset of variables (mtry).
-// 2. For each candidate variable, considers possible split points.
-// 3. Computes the decrease in Gini impurity for each split.
-// 4. Chooses the split with the largest reduction in Gini impurity.
+// 1. For each candidate variable, considers possible split points.
+// 2. Computes the decrease in Gini impurity for each split.
+// 3. Chooses the split with the largest reduction in Gini impurity.
 
 void TreeClassification::addGiniImportance(size_t nodeID, size_t varID, double decrease) {
 
