@@ -7,6 +7,9 @@
 
  Please note that the C++ core of ranger is distributed under MIT license and the
  R package "ranger" under GPL3 license.
+ 
+ Edited by Caroline Dravillas to implement stratified gini index for handling
+ batch effects.
  #-------------------------------------------------------------------------------*/
 
 #include <unordered_map>
@@ -22,9 +25,11 @@
 namespace ranger {
 
 TreeClassification::TreeClassification(std::vector<double>* class_values, std::vector<uint>* response_classIDs,
-    std::vector<std::vector<size_t>>* sampleIDs_per_class, std::vector<double>* class_weights) :
+    std::vector<std::vector<size_t>>* sampleIDs_per_class, std::vector<double>* class_weights,
+    std::vector<uint>* sample_batchIDs, std::vector<double>* batch_weights) :
     class_values(class_values), response_classIDs(response_classIDs), sampleIDs_per_class(sampleIDs_per_class), class_weights(
-        class_weights), counter(0), counter_per_class(0) {
+        class_weights), sample_batchIDs(sample_batchIDs), batch_weights(batch_weights),
+        counter(0), counter_per_class(0) {
 }
 
 TreeClassification::TreeClassification(std::vector<std::vector<size_t>>& child_nodeIDs,
