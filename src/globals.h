@@ -7,6 +7,9 @@ This software may be modified and distributed under the terms of the MIT license
 
 Please note that the C++ core of ranger is distributed under MIT license and the
 R package "ranger" under GPL3 license.
+ 
+ Edited by Caroline Dravillas to implement stratified gini index for handling
+ batch effects.
 #-------------------------------------------------------------------------------*/
 
 #ifndef GLOBALS_H_
