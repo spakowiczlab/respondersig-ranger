@@ -7,6 +7,9 @@
 
  Please note that the C++ core of ranger is distributed under MIT license and the
  R package "ranger" under GPL3 license.
+ 
+ Edited by Caroline Dravillas to implement stratified gini index for handling
+ batch effects.
  #-------------------------------------------------------------------------------*/
 
 #include <unordered_map>
@@ -95,6 +98,48 @@ void ForestClassification::initInternal() {
 
   // Set class weights all to 1
   class_weights = std::vector<double>(class_values.size(), 1.0);
+  
+  // compute batch counts and weights 
+  if (!sample_batchIDs.empty()) {
+    std::vector<uint> unique_batches;
+    std::vector<uint> mapped_batchIDs;
+    mapped_batchIDs.reserve(num_samples);
+    
+    for(size_t i =0; i < num_samples; i++){
+      uint raw_batch = sample_batchIDs[i];
+      
+      // search if this batch ID has aready been seen 
+      auto it = std::find(unique_batches.begin(), unique_batches.end(), raw_batch);
+      uint batchID;
+      
+      if(it == unique_batches.end()) {
+        // new batch ID -> get its index
+        batchID = unique_batches.size();
+        unique_batches.push_back(raw_batch);
+      } else{
+        // Existing batch ID -> get its index
+        batchID = std::distance(unique_batches.begin(), it);
+      }
+      mapped_batchIDs.push_back(batchID);
+    }
+    
+    // replace the original vector within contiguous 0-indexed IDs
+    this->sample_batchIDs = mapped_batchIDs;
+    this->num_batches = unique_batches.size();
+    
+    // calculate batch weights 
+    if (batch_weights.empty()) {
+      batch_weights.assign(num_batches, 0.0);
+      for (size_t i = 0; i < num_batches; i++){
+        batch_weights[sample_batchIDs[i]] += 1.0;
+      }
+      // range based loop
+      // type var : container
+      for (double& w : batch_weights) {
+        w /= (double)num_samples;
+      }
+    }
+  }
 
   // Sort data if memory saving mode
   if (!memory_saving_splitting) {
@@ -106,7 +151,7 @@ void ForestClassification::growInternal() {
   trees.reserve(num_trees);
   for (size_t i = 0; i < num_trees; ++i) {
     trees.push_back(
-        std::make_unique<TreeClassification>(&class_values, &response_classIDs, &sampleIDs_per_class, &class_weights));
+        std::make_unique<TreeClassification>(&class_values, &response_classIDs, &sampleIDs_per_class, &class_weights, &sample_batchIDs, &batch_weights));
   }
 }
 
