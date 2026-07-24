@@ -61,7 +61,8 @@ enum SplitRule {
   EXTRATREES = 5,
   BETA = 6,
   HELLINGER = 7,
-  POISSON = 8
+  POISSON = 8,
+  STRATIFIED_GINI = 9
 };
 
 // Prediction type
