@@ -24,6 +24,9 @@
 # Germany
 #
 # http://www.imbs-luebeck.de
+# 
+# Edited by Caroline Dravillas to implement stratified gini index for handling
+# batch effects.
 # -------------------------------------------------------------------------------
 
 ##' Ranger is a fast implementation of random forests (Breiman 2001) or recursive partitioning, particularly suited for high dimensional data.
