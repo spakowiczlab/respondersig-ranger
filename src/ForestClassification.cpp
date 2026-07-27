@@ -130,7 +130,7 @@ void ForestClassification::initInternal() {
     // calculate batch weights 
     if (batch_weights.empty()) {
       batch_weights.assign(num_batches, 0.0);
-      for (size_t i = 0; i < num_batches; i++){
+      for (size_t i = 0; i < num_samples; i++){
         batch_weights[sample_batchIDs[i]] += 1.0;
       }
       // range based loop
