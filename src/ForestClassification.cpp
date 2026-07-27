@@ -108,7 +108,7 @@ void ForestClassification::initInternal() {
     for(size_t i =0; i < num_samples; i++){
       uint raw_batch = sample_batchIDs[i];
       
-      // search if this batch ID has aready been seen 
+      // search if this batch ID has already been seen 
       auto it = std::find(unique_batches.begin(), unique_batches.end(), raw_batch);
       uint batchID;
       

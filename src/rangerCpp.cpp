@@ -23,6 +23,9 @@
  23562 Lübeck
 
  http://www.imbs-luebeck.de
+ 
+ Edited by Caroline Dravillas to implement stratified gini index for handling
+ batch effects.
  #-------------------------------------------------------------------------------*/
 
 #include <RcppEigen.h>
