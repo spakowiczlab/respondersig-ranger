@@ -299,18 +299,29 @@ void TreeClassification::findBestSplitValueSmallQ(size_t nodeID, size_t varID, s
     double& best_decrease, const std::vector<double>& possible_split_values, std::vector<size_t>& counter_per_class,
     std::vector<size_t>& counter) {
   
+  const size_t num_splits = possible_split_values.size();
+  size_t num_batches = batch_weights->size();
+  
+  // 2D counter for candidate split: (num_splits * num_batches * num_classes)
+  std::vector<size_t> counter_per_batch_class(num_splits * num_batches * num_classes, 0);
+  std::vector<std::vector<size_t>> parent_batch_counts(num_batches, std::vector<size_t>(num_classes, 0));
+  
   for (size_t pos = start_pos[nodeID]; pos < end_pos[nodeID]; ++pos) {
     size_t sampleID = sampleIDs[pos];
     uint sample_classID = (*response_classIDs)[sampleID];
+    uint sample_batchID = (*sample_batchIDs)[sampleID]; // get sample batch
+    
     size_t idx = std::lower_bound(possible_split_values.begin(), possible_split_values.end(),
         data->get_x(sampleID, varID)) - possible_split_values.begin();
 
-    ++counter_per_class[idx * num_classes + sample_classID];
+    ++counter_per_batch_class[idx * (num_batches * num_classes) + sample_batchID * num_classes + sample_classID];
     ++counter[idx];
+    ++parent_batch_counts[sample_batchID][sample_classID];
   }
 
   size_t n_left = 0;
   std::vector<size_t> class_counts_left(num_classes);
+  std::vector<std::vector<size_t>> class_counts_left_batch(num_batches, std::vector<size_t>(num_classes, 0));
 
   // Compute decrease of impurity for each split
   for (size_t i = 0; i < possible_split_values.size() - 1; ++i) {
@@ -348,6 +359,44 @@ void TreeClassification::findBestSplitValueSmallQ(size_t nodeID, size_t varID, s
       double a1 = sqrt(tpr) - sqrt(fpr);
       double a2 = sqrt(1 - tpr) - sqrt(1 - fpr);
       decrease = sqrt(a1 * a1 + a2 * a2);
+   
+    } else if (splitrule == STRATIFIED_GINI) {
+      // new strat gini branch
+      double gini_L = 0.0;
+      double gini_R = 0.0;
+      
+      for (size_t k = 0; k < num_batches; ++k){
+        // left child counts for batch k
+        class_counts_left_batch[k][0] += counter_per_batch_class[i * (num_batches * num_classes) + k * num_classes + 0];
+        class_counts_left_batch[k][1] += counter_per_batch_class[i * (num_batches * num_classes) + k * num_classes + 1];
+        
+        size_t n_L_k = class_counts_left_batch[k][0] + class_counts_left_batch[k][1];
+        
+        // right child counts for batch k = (parent node count for batch k) - (left child node count for batch k)
+        size_t c_R_k0 = parent_batch_counts[k][0] - class_counts_left_batch[k][0];
+        size_t c_R_k1 = parent_batch_counts[k][1] - class_counts_left_batch[k][1];
+        size_t n_R_k = c_R_k0 + c_R_k1;
+        
+        double w_k = (*batch_weights)[k];
+        
+        // left child gini: 2 * p_k * (1- p_k)
+        if (n_L_k > 0){
+          double p_L_k = (double)class_counts_left_batch[k][1] / (double)n_L_k;
+          gini_L += w_k * 2.0 * p_L_k * (1.0 - p_L_k);
+        }
+        
+        // right child gini
+        if (n_R_k > 0){
+          double p_R_k = (double)c_R_k1 / (double)n_R_k;
+          gini_R += w_k * 2.0 * p_R_k * (1.0 - p_R_k);
+        }
+      }
+      
+      // Decrease = - weighted child impurity (maximizing reduction in impurity)
+      double weighted_child_gini = ((double)n_left / num_samples_node) * gini_L +
+                                   ((double)n_right / num_samples_node) * gini_R;
+      decrease = -weighted_child_gini;
+      
     } else {
       // Sum of squares
       double sum_left = 0;
