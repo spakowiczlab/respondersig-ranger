@@ -811,6 +811,13 @@ ranger <- function(formula = NULL, data = NULL, num.trees = 500, mtry = NULL,
     } else {
       stop("Error: Gini splitrule applicable to classification data only.")
     }
+  } else if (splitrule == "stratified-gini" || "stratified") {
+    if (treetype %in% c(1,9)) {
+      # corresponds to split rule STRATIFIED_GINI in globals.h
+      splitrule.num <- 9
+    } else {
+      stop("Error: Stratified Gini splitrule applicable to classification data only.")
+    }
   } else if (splitrule == "variance") {
     if (treetype == 3) {
       splitrule.num <- 1
