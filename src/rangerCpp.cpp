@@ -200,6 +200,12 @@ Rcpp::List rangerCpp(uint treetype, Rcpp::NumericMatrix& input_x, Rcpp::NumericM
         temp.setClassWeights(class_weights);
       }
       
+      // Set batch ids
+      if (treetype == TREE_CLASSIFICATION && !batch_ids.empty()) {
+        auto& temp = dynamic_cast<ForestClassification&>(*forest);
+        temp.setBatchIDs(batch_ids);
+      }
+      
       // Set time points of interest
       if (treetype == TREE_SURVIVAL && !time_interest.empty()) {
         auto& temp = dynamic_cast<ForestSurvival&>(*forest);
