@@ -267,7 +267,8 @@ bool TreeClassification::findBestSplit(size_t nodeID, std::vector<size_t>& possi
 }
 // end findBestSplit function 
 
-// another find best split function? 
+// this is the one we will edit first b/c its used most often and for continuous vars 
+// like microbiome data 
 void TreeClassification::findBestSplitValueSmallQ(size_t nodeID, size_t varID, size_t num_classes,
     const std::vector<size_t>& class_counts, size_t num_samples_node, double& best_value, size_t& best_varID,
     double& best_decrease) {
@@ -361,6 +362,11 @@ void TreeClassification::findBestSplitValueSmallQ(size_t nodeID, size_t varID, s
       decrease = sqrt(a1 * a1 + a2 * a2);
    
     } else if (splitrule == STRATIFIED_GINI) {
+      
+      if (batch_weights == nullptr || batch_weights->empty() || sample_batchIDs == nullptr) {
+        throw std::runtime_error("Error: batch.ids must be provided when using splitrule = 'stratified-gini'");
+      }
+      
       // new strat gini branch
       double gini_L = 0.0;
       double gini_R = 0.0;
