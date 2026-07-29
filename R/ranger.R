@@ -1047,7 +1047,7 @@ ranger <- function(formula = NULL, data = NULL, num.trees = 500, mtry = NULL,
                       holdout, prediction.type, num.random.splits, sparse.x, use.sparse.data,
                       order.snps, oob.error, max.depth, inbag, use.inbag, 
                       regularization.factor, use.regularization.factor, regularization.usedepth,
-                      node.stats, time.interest, use.time.interest, any.na)
+                      node.stats, time.interest, use.time.interest, any.na, batch.ids)
 
   
   if (length(result) == 0) {
