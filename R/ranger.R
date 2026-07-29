@@ -729,7 +729,7 @@ ranger <- function(formula = NULL, data = NULL, num.trees = 500, mtry = NULL,
   ## Handle batch IDs for stratified gini
   if(!is.null(batch.ids)) {
     if(length(batch.ids) != nrow(x)) {
-      stop("Error: Lenght of batch.ids must be equal to the number of observations.")
+      stop("Error: Length of batch.ids must be equal to the number of observations.")
     }
     # 0 indexing in C++
     batch.ids <- as.numeric(as.factor(batch.ids)) - 1
