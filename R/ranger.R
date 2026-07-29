@@ -248,7 +248,7 @@ ranger <- function(formula = NULL, data = NULL, num.trees = 500, mtry = NULL,
                    min.node.size = NULL, min.bucket = NULL, max.depth = NULL, 
                    replace = TRUE, sample.fraction = ifelse(replace, 1, 0.632), 
                    case.weights = NULL, class.weights = NULL, splitrule = NULL, 
-                   num.random.splits = 1, batch.ids = NULL, alpha = 0.5, minprop = 0.1,
+                   num.random.splits = 1, alpha = 0.5, minprop = 0.1,
                    poisson.tau = 1,
                    split.select.weights = NULL, always.split.variables = NULL,
                    respect.unordered.factors = NULL,
@@ -260,7 +260,7 @@ ranger <- function(formula = NULL, data = NULL, num.trees = 500, mtry = NULL,
                    num.threads = NULL, save.memory = FALSE,
                    verbose = TRUE, node.stats = FALSE, seed = NULL, na.action = "na.learn",
                    dependent.variable.name = NULL, status.variable.name = NULL, 
-                   classification = NULL, x = NULL, y = NULL, ...) {
+                   classification = NULL, x = NULL, y = NULL, batch.ids = NULL, ...) {
   
   ## Handle ... arguments
   if (length(list(...)) > 0) {
@@ -723,6 +723,17 @@ ranger <- function(formula = NULL, data = NULL, num.trees = 500, mtry = NULL,
     if (!replace && sum(case.weights > 0) < sample.fraction * nrow(x)) {
       stop("Error: Fewer non-zero case weights than observations to sample.")
     }
+  }
+  
+  ## Handle batch IDs for stratified gini
+  if(!is.null(batch.ids)) {
+    if(length(batch.ids) != nrow(x)) {
+      stop("Error: Lenght of batch.ids must be equal to the number of observations.")
+    }
+    # 0 indexing in C++
+    batch.ids <- as.numeric(as.factor(batch.ids)) - 1
+  } else {
+    batch.id <- numeric(0) # empty vector
   }
   
   ## Manual inbag selection
