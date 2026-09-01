@@ -1036,6 +1036,12 @@ ranger <- function(formula = NULL, data = NULL, num.trees = 500, mtry = NULL,
     }
   }
   
+  # add catch for if standard use w/ no batch_ids 
+  # convert from NULL
+  if (is.null(batch.ids)) {
+    batch.ids <- integer(0)
+  }
+  
   ## Call Ranger
   result <- rangerCpp(treetype, x, y.mat, independent.variable.names, mtry,
                       num.trees, verbose, seed, num.threads, write.forest, importance.mode,
