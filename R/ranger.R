@@ -734,7 +734,7 @@ ranger <- function(formula = NULL, data = NULL, num.trees = 500, mtry = NULL,
     # 0 indexing in C++
     batch.ids <- as.numeric(as.factor(batch.ids)) - 1
   } else {
-    batch.id <- numeric(0) # empty vector
+    batch.ids <- numeric(0) # empty vector
   }
   
   ## Manual inbag selection
@@ -826,7 +826,7 @@ ranger <- function(formula = NULL, data = NULL, num.trees = 500, mtry = NULL,
     } else {
       stop("Error: Gini splitrule applicable to classification data only.")
     }
-  } else if (splitrule == "stratified-gini" || "stratified") {
+  } else if (splitrule == "stratified-gini" || splitrule == "stratified") {
     if (treetype %in% c(1,9)) {
       # corresponds to split rule STRATIFIED_GINI in globals.h
       splitrule.num <- 9
@@ -1034,12 +1034,6 @@ ranger <- function(formula = NULL, data = NULL, num.trees = 500, mtry = NULL,
     if (!all(y.mat[, 2] %in% 0:1)) {
       stop("Error: Competing risks not supported yet. Use status=1 for events and status=0 for censoring.")
     }
-  }
-  
-  # add catch for if standard use w/ no batch_ids 
-  # convert from NULL
-  if (is.null(batch.ids)) {
-    batch.ids <- integer(0)
   }
   
   ## Call Ranger
