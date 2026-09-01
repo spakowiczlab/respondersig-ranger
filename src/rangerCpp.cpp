@@ -154,6 +154,12 @@ Rcpp::List rangerCpp(uint treetype, Rcpp::NumericMatrix& input_x, Rcpp::NumericM
     ImportanceMode importance_mode = (ImportanceMode) importance_mode_r;
     SplitRule splitrule = (SplitRule) splitrule_r;
     PredictionType prediction_type = (PredictionType) prediction_type_r;
+    
+    // Set batch ids
+    if (treetype == TREE_CLASSIFICATION && !batch_ids.empty()) {
+      auto& temp = dynamic_cast<ForestClassification&>(*forest);
+      temp.setBatchIDs(batch_ids);
+    }
 
     // Init Ranger
     forest->initR(std::move(data), mtry, num_trees, verbose_out, seed, num_threads,
@@ -198,12 +204,6 @@ Rcpp::List rangerCpp(uint treetype, Rcpp::NumericMatrix& input_x, Rcpp::NumericM
       } else if (treetype == TREE_PROBABILITY && !class_weights.empty()) {
         auto& temp = dynamic_cast<ForestProbability&>(*forest);
         temp.setClassWeights(class_weights);
-      }
-      
-      // Set batch ids
-      if (treetype == TREE_CLASSIFICATION && !batch_ids.empty()) {
-        auto& temp = dynamic_cast<ForestClassification&>(*forest);
-        temp.setBatchIDs(batch_ids);
       }
       
       // Set time points of interest
