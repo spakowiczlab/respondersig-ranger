@@ -76,7 +76,8 @@ predict.ranger.forest <- function(object, data, predict.all = FALSE,
                                   num.trees = object$num.trees, 
                                   type = "response", se.method = "infjack",
                                   seed = NULL, num.threads = NULL,
-                                  verbose = TRUE, inbag.counts = NULL, ...) {
+                                  verbose = TRUE, inbag.counts = NULL,
+                                  batch.ids = NULL, ...) {
 
   ## GenABEL GWA data
   if (inherits(data, "gwaa.data")) {
@@ -269,6 +270,15 @@ predict.ranger.forest <- function(object, data, predict.all = FALSE,
     x <- data.matrix(x)
   }
   
+  if (!is.null(batch.ids)) {
+    if (length(batch.ids) != nrow(x)) {
+      stop("Error: Length of batch.ids must be equal to the number of observations.")
+    }
+    batch.ids <- as.numeric(as.factor(batch.ids)) - 1
+  } else {
+    batch.ids <- 0
+  }
+  
   ## Call Ranger
   result <- rangerCpp(treetype, x, y, forest$independent.variable.names, mtry,
                       num.trees, verbose, seed, num.threads, write.forest, importance,
@@ -281,7 +291,7 @@ predict.ranger.forest <- function(object, data, predict.all = FALSE,
                       prediction.type, num.random.splits, sparse.x, use.sparse.data,
                       order.snps, oob.error, max.depth, inbag, use.inbag, 
                       regularization.factor, use.regularization.factor, regularization.usedepth, 
-                      node.stats, time.interest, use.time.interest, any.na)
+                      node.stats, time.interest, use.time.interest, any.na, batch.ids)
 
   if (length(result) == 0) {
     stop("User interrupt or internal error.")
