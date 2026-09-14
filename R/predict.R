@@ -24,6 +24,9 @@
 # Germany
 #
 # http://www.imbs-luebeck.de
+#
+# Edited by Caroline Dravillas to implement stratified gini index and 
+# Mantel-Haenszel for handling batch effects.
 # -------------------------------------------------------------------------------
 
 ##' Prediction with new data and a saved forest from Ranger.
