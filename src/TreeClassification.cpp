@@ -529,6 +529,7 @@ void TreeClassification::findBestSplitValueLargeQ(size_t nodeID, size_t varID, s
       double gini_L = 0.0;
       double gini_R = 0.0;
       
+      // iterate through each batch
       for (size_t k = 0; k < num_batches; ++k){
         // left child counts for batch k
         class_counts_left_batch[k][0] += counter_per_batch_class[i * (num_batches * num_classes) + k * num_classes + 0];
@@ -561,6 +562,36 @@ void TreeClassification::findBestSplitValueLargeQ(size_t nodeID, size_t varID, s
         ((double)n_right / num_samples_node) * gini_R;
       decrease = -weighted_child_gini;
       
+    // new mantel-haenszel split logic
+    // goal is to maximize the difference AKA largest test statistic
+    } else if (splitrule == MANTEL_HAENSZEL){
+      if (batch_weights == nullptr || batch_weights->empty() || sample_batchIDs == nullptr) {
+        throw std::runtime_error("Error: batch.ids must be provided when using splitrule = 'mantel-haenszel'");
+      }
+      
+      // containers for numerator and denominator
+      double sum_num = 0.0;
+      double sum_denom = 0.0;
+
+      // iterate through each batch 
+      for (size_t k = 0; k < num_batches; ++k){
+
+        // split logic 
+        // calculate num and denom for each batch
+        // in order to calculate this we need 2x2 table for each batch
+        // class_counts[batch] and class_counts_left[batch] essentially 
+        // this is handled in split gini block w/ counter_per_batch_class
+        
+        // num = (TP - ((TP + FN)*(TP + FP) / (TOTAL)))
+        // denom = ((TP + FP)*(TP + FN)*(FN + TN)*(TP + FN)) / ((TOTAL)^2)*(TOTAL - 1))
+        
+      }
+      // sum num for each batch squared / sum denom for each batch = test stat
+      decrease = (sum_num * sum_num) / sum_denom;
+      // maximize test stat
+      
+      // need to wrap up logic here
+      
     } else {
       // Sum of squares
       double sum_left = 0;
@@ -574,7 +605,6 @@ void TreeClassification::findBestSplitValueLargeQ(size_t nodeID, size_t varID, s
       }
 
       // Decrease of impurity
-      // this calculation needs edited...
       decrease = sum_right / (double) n_right + sum_left / (double) n_left;
     }
     
