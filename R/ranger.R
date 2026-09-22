@@ -904,6 +904,9 @@ ranger <- function(formula = NULL, data = NULL, num.trees = 500, mtry = NULL,
   if (splitrule == "maxstat" & use.regularization.factor) {
     stop("Error: Regularization cannot be used with 'maxstat' splitrule.")
   }
+  if ((splitrule == "stratified-gini" || splitrule == "stratified") & use.regularization.factor) {
+    stop("Error: Regularization cannot be used with 'stratified-gini' splitrule.")
+  }
 
   ## Extra trees
   if (!is.numeric(num.random.splits) || num.random.splits < 1) {
