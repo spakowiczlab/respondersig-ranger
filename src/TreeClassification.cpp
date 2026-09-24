@@ -531,7 +531,7 @@ void TreeClassification::findBestSplitValueLargeQ(size_t nodeID, size_t varID, s
       
       // iterate through each batch
       for (size_t k = 0; k < num_batches; ++k){
-        // left child counts for batch k
+        // left child counts for batch k at split i
         class_counts_left_batch[k][0] += counter_per_batch_class[i * (num_batches * num_classes) + k * num_classes + 0];
         class_counts_left_batch[k][1] += counter_per_batch_class[i * (num_batches * num_classes) + k * num_classes + 1];
         
@@ -565,6 +565,7 @@ void TreeClassification::findBestSplitValueLargeQ(size_t nodeID, size_t varID, s
     // new mantel-haenszel split logic
     // goal is to maximize the difference AKA largest test statistic
     } else if (splitrule == MANTEL_HAENSZEL){
+      // error if no batch ids provided 
       if (batch_weights == nullptr || batch_weights->empty() || sample_batchIDs == nullptr) {
         throw std::runtime_error("Error: batch.ids must be provided when using splitrule = 'mantel-haenszel'");
       }
@@ -575,22 +576,32 @@ void TreeClassification::findBestSplitValueLargeQ(size_t nodeID, size_t varID, s
 
       // iterate through each batch 
       for (size_t k = 0; k < num_batches; ++k){
-
-        // split logic 
-        // calculate num and denom for each batch
-        // in order to calculate this we need 2x2 table for each batch
-        // class_counts[batch] and class_counts_left[batch] essentially 
-        // this is handled in split gini block w/ counter_per_batch_class
         
-        // num = (TP - ((TP + FN)*(TP + FP) / (TOTAL)))
-        // denom = ((TP + FP)*(TP + FN)*(FN + TN)*(TP + FN)) / ((TOTAL)^2)*(TOTAL - 1))
+        // left child counts for batch k at split i
+        class_counts_left_batch[k][0] += counter_per_batch_class[i * (num_batches * num_classes) + k * num_classes + 0];
+        class_counts_left_batch[k][1] += counter_per_batch_class[i * (num_batches * num_classes) + k * num_classes + 1];
         
-      }
-      // sum num for each batch squared / sum denom for each batch = test stat
-      decrease = (sum_num * sum_num) / sum_denom;
-      // maximize test stat
+        // 2x2 table for each batch
+        double tp = class_counts_left_batch[k][1]; // true positives, left class 1
+        double fp = class_counts_left_batch[k][0]; // false postives, left class 0
+        double tn = parent_batch_counts[k][0]- class_counts_left_batch[k][0]; // true negatives
+        double fn = parent_batch_counts[k][1]- class_counts_left_batch[k][1]; // false negatives
+        double total = tp + fp + tn + fn;
       
-      // need to wrap up logic here
+        // calculate num and denom for each batch
+        if(total > 1.0){
+          // num = TP - ((TP + FN)*(TP + FP) / TOTAL)
+          sum_num += tp - ((tp + fn)*(tp + fp) / total);
+          // denom = (TP + FP)*(TP + FN)*(FN + TN)*(FP + TN)) / ((TOTAL)^2)*(TOTAL - 1)
+          sum_denom += ((tp + fp)*(tp +fn)*(fn + tn)*(fp + tn) / (total*total*(total - 1.0)));
+        }
+      }
+      if(sum_denom > 0.0){
+        // sum num for each batch squared / sum denom for each batch = test stat
+        decrease = (sum_num * sum_num) / sum_denom;
+      } else {
+        decrease = -1.0; //invalid
+      }
       
     } else {
       // Sum of squares
