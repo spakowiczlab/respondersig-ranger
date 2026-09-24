@@ -833,6 +833,16 @@ ranger <- function(formula = NULL, data = NULL, num.trees = 500, mtry = NULL,
     } else {
       stop("Error: Stratified Gini splitrule applicable to classification data only.")
     }
+  } else if (splitrule == "mantel-haenszel"){
+    if (treetype %in% c(1,9)) {
+      # corresponds to split rule MANTEL-HAENSZEL in globals.h
+      splitrule.num <- 10
+    } else {
+      stop("Error: Mantel-Haenszel splitrule applicable to classification data only.")
+    } 
+    if((is.factor(y) && nlevels(y) > 2 || length(unique(y)) > 2)){
+      stop("Error: Mantel-Haenszel splitrule applicable for binary classification only.")
+    }
   } else if (splitrule == "variance") {
     if (treetype == 3) {
       splitrule.num <- 1
