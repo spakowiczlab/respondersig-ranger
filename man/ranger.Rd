@@ -48,6 +48,7 @@ ranger(
   classification = NULL,
   x = NULL,
   y = NULL,
+  batch.ids = NULL,
   ...
 )
 }
@@ -140,6 +141,8 @@ If a terminal node has only 0 responses, the estimate is set to \eqn{\alpha 0 + 
 \item{x}{Predictor data (independent variables), alternative interface to data with formula or dependent.variable.name.}
 
 \item{y}{Response vector (dependent variable), alternative interface to data with formula or dependent.variable.name. For survival use a \code{Surv()} object or a matrix with time and status.}
+
+\item{batch.ids}{Batch IDs.}
 
 \item{...}{Further arguments passed to or from other methods (currently ignored).}
 }
