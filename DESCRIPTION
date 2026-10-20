@@ -1,4 +1,4 @@
-Package: ranger
+Package: rangerRsig
 Type: Package
 Title: A Fast Implementation of Random Forests
 Version: 0.18.0.2

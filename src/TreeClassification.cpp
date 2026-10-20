@@ -587,6 +587,9 @@ void TreeClassification::findBestSplitValueLargeQ(size_t nodeID, size_t varID, s
         double tn = parent_batch_counts[k][0]- class_counts_left_batch[k][0]; // true negatives
         double fn = parent_batch_counts[k][1]- class_counts_left_batch[k][1]; // false negatives
         double total = tp + fp + tn + fn;
+        
+        // add error and stop if total < 2 
+        // stop splitting?
       
         // calculate num and denom for each batch
         if(total > 1.0){

@@ -238,7 +238,7 @@
 ##'   \item Probst, P., Wright, M. N. & Boulesteix, A-L. (2019). Hyperparameters and tuning strategies for random forest. WIREs Data Mining Knowl Discov 9:e1301.\doi{10.1002/widm.1301}.
 ##'   }
 ##' @seealso \code{\link{predict.ranger}}
-##' @useDynLib ranger, .registration = TRUE
+##' @useDynLib rangerRsig, .registration = TRUE
 ##' @importFrom Rcpp evalCpp
 ##' @import stats 
 ##' @import utils
