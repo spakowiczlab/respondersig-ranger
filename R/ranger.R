@@ -826,22 +826,23 @@ ranger <- function(formula = NULL, data = NULL, num.trees = 500, mtry = NULL,
     } else {
       stop("Error: Gini splitrule applicable to classification data only.")
     }
-  } else if (splitrule == "stratified-gini" || splitrule == "stratified") {
-    if (treetype %in% c(1,9)) {
-      # corresponds to split rule STRATIFIED_GINI in globals.h
-      splitrule.num <- 9
+  } else if (splitrule == "stratified-gini") {
+    if (treetype %in% c(1, 9)) {
+      if (length(unique(y[!is.na(y)])) != 2) {
+        stop("Error: stratified-gini splitrule only implemented for binary classification.")
+      }
+      splitrule.num <- 9  # Use the ID assigned in your C++ code
     } else {
-      stop("Error: Stratified Gini splitrule applicable to classification data only.")
+      stop("Error: stratified-gini splitrule applicable to classification data only.")
     }
   } else if (splitrule == "mantel-haenszel"){
-    if (treetype %in% c(1,9)) {
-      # corresponds to split rule MANTEL-HAENSZEL in globals.h
-      splitrule.num <- 10
+    if (treetype %in% c(1, 9)) {
+      if (length(unique(y[!is.na(y)])) != 2) {
+        stop("Error: mantel-haenszel splitrule only implemented for binary classification.")
+      }
+      splitrule.num <- 10  # Use the ID assigned in your C++ code
     } else {
-      stop("Error: Mantel-Haenszel splitrule applicable to classification data only.")
-    } 
-    if((is.factor(y) && nlevels(y) > 2 || length(unique(y)) > 2)){
-      stop("Error: Mantel-Haenszel splitrule applicable for binary classification only.")
+      stop("Error: mantel-haenszel splitrule applicable to classification data only.")
     }
   } else if (splitrule == "variance") {
     if (treetype == 3) {
@@ -914,7 +915,7 @@ ranger <- function(formula = NULL, data = NULL, num.trees = 500, mtry = NULL,
   if (splitrule == "maxstat" & use.regularization.factor) {
     stop("Error: Regularization cannot be used with 'maxstat' splitrule.")
   }
-  if ((splitrule == "stratified-gini" || splitrule == "stratified") & use.regularization.factor) {
+  if ((splitrule == "stratified-gini") & use.regularization.factor) {
     stop("Error: Regularization cannot be used with 'stratified-gini' splitrule.")
   }
   if ((splitrule == "mantel-haenszel") & use.regularization.factor) {

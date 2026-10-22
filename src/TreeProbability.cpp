@@ -16,9 +16,10 @@
 namespace ranger {
 
 TreeProbability::TreeProbability(std::vector<double>* class_values, std::vector<uint>* response_classIDs,
-    std::vector<std::vector<size_t>>* sampleIDs_per_class, std::vector<double>* class_weights) :
+    std::vector<std::vector<size_t>>* sampleIDs_per_class, std::vector<double>* class_weights,
+    std::vector<uint>* sample_batchIDs, std::vector<double>* batch_weights) :
     class_values(class_values), response_classIDs(response_classIDs), sampleIDs_per_class(sampleIDs_per_class), class_weights(
-        class_weights), counter(0), counter_per_class(0) {
+        class_weights), sample_batchIDs(sample_batchIDs), batch_weights(batch_weights), counter(0), counter_per_class(0) {
 }
 
 TreeProbability::TreeProbability(std::vector<std::vector<size_t>>& child_nodeIDs, std::vector<size_t>& split_varIDs,
@@ -287,18 +288,29 @@ void TreeProbability::findBestSplitValueSmallQ(size_t nodeID, size_t varID, size
     double& best_decrease, const std::vector<double>& possible_split_values, std::vector<size_t>& counter_per_class,
     std::vector<size_t>& counter) {
 
+  const size_t num_splits = possible_split_values.size();
+  size_t num_batches = batch_weights->size();
+  
+  // 2D counter for candidate split: (num_splits * num_batches * num_classes)
+  std::vector<size_t> counter_per_batch_class(num_splits * num_batches * num_classes, 0);
+  std::vector<std::vector<size_t>> parent_batch_counts(num_batches, std::vector<size_t>(num_classes, 0));
+  
   for (size_t pos = start_pos[nodeID]; pos < end_pos[nodeID]; ++pos) {
     size_t sampleID = sampleIDs[pos];
     uint sample_classID = (*response_classIDs)[sampleID];
+    uint sample_batchID = (*sample_batchIDs)[sampleID]; // get sample batch
+    
     size_t idx = std::lower_bound(possible_split_values.begin(), possible_split_values.end(),
-        data->get_x(sampleID, varID)) - possible_split_values.begin();
-
-    ++counter_per_class[idx * num_classes + sample_classID];
+                                  data->get_x(sampleID, varID)) - possible_split_values.begin();
+    
+    ++counter_per_batch_class[idx * (num_batches * num_classes) + sample_batchID * num_classes + sample_classID];
     ++counter[idx];
+    ++parent_batch_counts[sample_batchID][sample_classID];
   }
-
+  
   size_t n_left = 0;
   std::vector<size_t> class_counts_left(num_classes);
+  std::vector<std::vector<size_t>> class_counts_left_batch(num_batches, std::vector<size_t>(num_classes, 0));
 
   // Compute decrease of impurity for each split
   for (size_t i = 0; i < possible_split_values.size() - 1; ++i) {
@@ -336,6 +348,92 @@ void TreeProbability::findBestSplitValueSmallQ(size_t nodeID, size_t varID, size
       double a1 = sqrt(tpr) - sqrt(fpr);
       double a2 = sqrt(1 - tpr) - sqrt(1 - fpr);
       decrease = sqrt(a1 * a1 + a2 * a2);
+    } else if (splitrule == STRATIFIED_GINI) {
+      
+      if (batch_weights == nullptr || batch_weights->empty() || sample_batchIDs == nullptr) {
+        throw std::runtime_error("Error: batch.ids must be provided when using splitrule = 'stratified-gini'");
+      }
+      
+      double gini_L = 0.0;
+      double gini_R = 0.0;
+      
+      // iterate through each batch
+      for (size_t k = 0; k < num_batches; ++k){
+        // left child counts for batch k at split i
+        class_counts_left_batch[k][0] += counter_per_batch_class[i * (num_batches * num_classes) + k * num_classes + 0];
+        class_counts_left_batch[k][1] += counter_per_batch_class[i * (num_batches * num_classes) + k * num_classes + 1];
+        
+        size_t n_L_k = class_counts_left_batch[k][0] + class_counts_left_batch[k][1];
+        
+        // right child counts for batch k = (parent node count for batch k) - (left child node count for batch k)
+        size_t c_R_k0 = parent_batch_counts[k][0] - class_counts_left_batch[k][0];
+        size_t c_R_k1 = parent_batch_counts[k][1] - class_counts_left_batch[k][1];
+        size_t n_R_k = c_R_k0 + c_R_k1;
+        
+        double w_k = (*batch_weights)[k];
+        
+        // left child gini: 2 * p_k * (1- p_k)
+        if (n_L_k > 0){
+          double p_L_k = (double)class_counts_left_batch[k][1] / (double)n_L_k;
+          gini_L += w_k * 2.0 * p_L_k * (1.0 - p_L_k);
+        }
+        
+        // right child gini
+        if (n_R_k > 0){
+          double p_R_k = (double)c_R_k1 / (double)n_R_k;
+          gini_R += w_k * 2.0 * p_R_k * (1.0 - p_R_k);
+        }
+      }
+      
+      // Decrease = - weighted child impurity (maximizing reduction in impurity)
+      double weighted_child_gini = ((double)n_left / num_samples_node) * gini_L +
+        ((double)n_right / num_samples_node) * gini_R;
+      decrease = -weighted_child_gini;
+      
+      // new mantel-haenszel split logic
+      // goal is to maximize the difference AKA largest test statistic
+    } else if (splitrule == MANTEL_HAENSZEL){
+      // error if no batch ids provided 
+      if (batch_weights == nullptr || batch_weights->empty() || sample_batchIDs == nullptr) {
+        throw std::runtime_error("Error: batch.ids must be provided when using splitrule = 'mantel-haenszel'");
+      }
+      
+      // containers for numerator and denominator
+      double sum_num = 0.0;
+      double sum_denom = 0.0;
+      
+      // iterate through each batch 
+      for (size_t k = 0; k < num_batches; ++k){
+        
+        // left child counts for batch k at split i
+        class_counts_left_batch[k][0] += counter_per_batch_class[i * (num_batches * num_classes) + k * num_classes + 0];
+        class_counts_left_batch[k][1] += counter_per_batch_class[i * (num_batches * num_classes) + k * num_classes + 1];
+        
+        // 2x2 table for each batch
+        double tp = class_counts_left_batch[k][1]; // true positives, left class 1
+        double fp = class_counts_left_batch[k][0]; // false postives, left class 0
+        double tn = parent_batch_counts[k][0]- class_counts_left_batch[k][0]; // true negatives
+        double fn = parent_batch_counts[k][1]- class_counts_left_batch[k][1]; // false negatives
+        double total = tp + fp + tn + fn;
+        
+        // add error and stop if total < 2 
+        // stop splitting?
+        
+        // calculate num and denom for each batch
+        if(total > 1.0){
+          // num = TP - ((TP + FN)*(TP + FP) / TOTAL)
+          sum_num += tp - ((tp + fn)*(tp + fp) / total);
+          // denom = (TP + FP)*(TP + FN)*(FN + TN)*(FP + TN)) / ((TOTAL)^2)*(TOTAL - 1)
+          sum_denom += ((tp + fp)*(tp +fn)*(fn + tn)*(fp + tn) / (total*total*(total - 1.0)));
+        }
+      }
+      if(sum_denom > 0.0){
+        // sum num for each batch squared / sum denom for each batch = test stat
+        decrease = (sum_num * sum_num) / sum_denom;
+      } else {
+        decrease = -1.0; //invalid
+      }
+      
     } else {
       // Sum of squares
       double sum_left = 0;
@@ -393,19 +491,29 @@ void TreeProbability::findBestSplitValueLargeQ(size_t nodeID, size_t varID, size
   size_t num_unique = data->getNumUniqueDataValues(varID);
   std::fill_n(counter_per_class.begin(), num_unique * num_classes, 0);
   std::fill_n(counter.begin(), num_unique, 0);
-
+  
+  size_t num_batches = batch_weights->size();
+  
+  // 2D counter for candidate split: (num_unique * num_batches * num_classes)
+  std::vector<size_t> counter_per_batch_class(num_unique * num_batches * num_classes, 0);
+  std::vector<std::vector<size_t>> parent_batch_counts(num_batches, std::vector<size_t>(num_classes, 0));
+  
   // Count values
   for (size_t pos = start_pos[nodeID]; pos < end_pos[nodeID]; ++pos) {
     size_t sampleID = sampleIDs[pos];
     size_t index = data->getIndex(sampleID, varID);
-    size_t classID = (*response_classIDs)[sampleID];
-
+    uint sample_classID = (*response_classIDs)[sampleID];
+    uint sample_batchID = (*sample_batchIDs)[sampleID];
+    
+    ++counter_per_batch_class[index * (num_batches * num_classes) + sample_batchID * num_classes + sample_classID];
     ++counter[index];
-    ++counter_per_class[index * num_classes + classID];
+    ++counter_per_class[index * num_classes + sample_classID];
+    ++parent_batch_counts[sample_batchID][sample_classID];
   }
-
+  
   size_t n_left = 0;
   std::vector<size_t> class_counts_left(num_classes);
+  std::vector<std::vector<size_t>> class_counts_left_batch(num_batches, std::vector<size_t>(num_classes, 0));
 
   // Compute decrease of impurity for each split
   for (size_t i = 0; i < num_unique - 1; ++i) {
@@ -443,6 +551,92 @@ void TreeProbability::findBestSplitValueLargeQ(size_t nodeID, size_t varID, size
       double a1 = sqrt(tpr) - sqrt(fpr);
       double a2 = sqrt(1 - tpr) - sqrt(1 - fpr);
       decrease = sqrt(a1 * a1 + a2 * a2);
+    } else if (splitrule == STRATIFIED_GINI) {
+      
+      if (batch_weights == nullptr || batch_weights->empty() || sample_batchIDs == nullptr) {
+        throw std::runtime_error("Error: batch.ids must be provided when using splitrule = 'stratified-gini'");
+      }
+      
+      double gini_L = 0.0;
+      double gini_R = 0.0;
+      
+      // iterate through each batch
+      for (size_t k = 0; k < num_batches; ++k){
+        // left child counts for batch k at split i
+        class_counts_left_batch[k][0] += counter_per_batch_class[i * (num_batches * num_classes) + k * num_classes + 0];
+        class_counts_left_batch[k][1] += counter_per_batch_class[i * (num_batches * num_classes) + k * num_classes + 1];
+        
+        size_t n_L_k = class_counts_left_batch[k][0] + class_counts_left_batch[k][1];
+        
+        // right child counts for batch k = (parent node count for batch k) - (left child node count for batch k)
+        size_t c_R_k0 = parent_batch_counts[k][0] - class_counts_left_batch[k][0];
+        size_t c_R_k1 = parent_batch_counts[k][1] - class_counts_left_batch[k][1];
+        size_t n_R_k = c_R_k0 + c_R_k1;
+        
+        double w_k = (*batch_weights)[k];
+        
+        // left child gini: 2 * p_k * (1- p_k)
+        if (n_L_k > 0){
+          double p_L_k = (double)class_counts_left_batch[k][1] / (double)n_L_k;
+          gini_L += w_k * 2.0 * p_L_k * (1.0 - p_L_k);
+        }
+        
+        // right child gini
+        if (n_R_k > 0){
+          double p_R_k = (double)c_R_k1 / (double)n_R_k;
+          gini_R += w_k * 2.0 * p_R_k * (1.0 - p_R_k);
+        }
+      }
+      
+      // Decrease = - weighted child impurity (maximizing reduction in impurity)
+      double weighted_child_gini = ((double)n_left / num_samples_node) * gini_L +
+        ((double)n_right / num_samples_node) * gini_R;
+      decrease = -weighted_child_gini;
+      
+      // new mantel-haenszel split logic
+      // goal is to maximize the difference AKA largest test statistic
+    } else if (splitrule == MANTEL_HAENSZEL){
+      // error if no batch ids provided 
+      if (batch_weights == nullptr || batch_weights->empty() || sample_batchIDs == nullptr) {
+        throw std::runtime_error("Error: batch.ids must be provided when using splitrule = 'mantel-haenszel'");
+      }
+      
+      // containers for numerator and denominator
+      double sum_num = 0.0;
+      double sum_denom = 0.0;
+      
+      // iterate through each batch 
+      for (size_t k = 0; k < num_batches; ++k){
+        
+        // left child counts for batch k at split i
+        class_counts_left_batch[k][0] += counter_per_batch_class[i * (num_batches * num_classes) + k * num_classes + 0];
+        class_counts_left_batch[k][1] += counter_per_batch_class[i * (num_batches * num_classes) + k * num_classes + 1];
+        
+        // 2x2 table for each batch
+        double tp = class_counts_left_batch[k][1]; // true positives, left class 1
+        double fp = class_counts_left_batch[k][0]; // false postives, left class 0
+        double tn = parent_batch_counts[k][0]- class_counts_left_batch[k][0]; // true negatives
+        double fn = parent_batch_counts[k][1]- class_counts_left_batch[k][1]; // false negatives
+        double total = tp + fp + tn + fn;
+        
+        // add error and stop if total < 2 
+        // stop splitting?
+        
+        // calculate num and denom for each batch
+        if(total > 1.0){
+          // num = TP - ((TP + FN)*(TP + FP) / TOTAL)
+          sum_num += tp - ((tp + fn)*(tp + fp) / total);
+          // denom = (TP + FP)*(TP + FN)*(FN + TN)*(FP + TN)) / ((TOTAL)^2)*(TOTAL - 1)
+          sum_denom += ((tp + fp)*(tp +fn)*(fn + tn)*(fp + tn) / (total*total*(total - 1.0)));
+        }
+      }
+      if(sum_denom > 0.0){
+        // sum num for each batch squared / sum denom for each batch = test stat
+        decrease = (sum_num * sum_num) / sum_denom;
+      } else {
+        decrease = -1.0; //invalid
+      }
+      
     } else {
       // Sum of squares
       double sum_left = 0;
