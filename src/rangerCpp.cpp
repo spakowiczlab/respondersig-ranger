@@ -160,6 +160,11 @@ Rcpp::List rangerCpp(uint treetype, Rcpp::NumericMatrix& input_x, Rcpp::NumericM
       auto& temp = dynamic_cast<ForestClassification&>(*forest);
       temp.setBatchIDs(batch_ids);
     }
+    
+    if (treetype == TREE_PROBABILITY && !batch_ids.empty()) {
+      auto& temp = dynamic_cast<ForestClassification&>(*forest);
+      temp.setBatchIDs(batch_ids);
+    }
 
     // Init Ranger
     forest->initR(std::move(data), mtry, num_trees, verbose_out, seed, num_threads,
