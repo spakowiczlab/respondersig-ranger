@@ -156,12 +156,21 @@ Rcpp::List rangerCpp(uint treetype, Rcpp::NumericMatrix& input_x, Rcpp::NumericM
     PredictionType prediction_type = (PredictionType) prediction_type_r;
     
     // Set batch ids
+    // if (treetype == TREE_CLASSIFICATION && !batch_ids.empty()) {
+    //   auto& temp = dynamic_cast<ForestClassification&>(*forest);
+    //   temp.setBatchIDs(batch_ids);
+    // }
+
+    // Set batch IDs
     if (treetype == TREE_CLASSIFICATION && !batch_ids.empty()) {
-      auto& temp = dynamic_cast<ForestClassification&>(*forest);
-      temp.setBatchIDs(batch_ids);
-    }
-    
-    if ((treetype == TREE_PROBABILITY || (treetype == TREE_CLASSIFICATION && probability)) && !batch_ids.empty()) {
+      if (probability) {
+        auto& temp = dynamic_cast<ForestProbability&>(*forest);
+        temp.setBatchIDs(batch_ids);
+      } else {
+        auto& temp = dynamic_cast<ForestClassification&>(*forest);
+        temp.setBatchIDs(batch_ids);
+      }
+    } else if (treetype == TREE_PROBABILITY && !batch_ids.empty()) {
       auto& temp = dynamic_cast<ForestProbability&>(*forest);
       temp.setBatchIDs(batch_ids);
     }
