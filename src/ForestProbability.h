@@ -7,6 +7,9 @@
 
  Please note that the C++ core of ranger is distributed under MIT license and the
  R package "ranger" under GPL3 license.
+ 
+ Edited by Caroline Dravillas to implement stratified gini index and 
+ Mantel-Haenszel for handling batch effects.
  #-------------------------------------------------------------------------------*/
 
 #ifndef FORESTPROBABILITY_H_
@@ -45,6 +48,17 @@ public:
   void setClassWeights(std::vector<double>& class_weights) {
     this->class_weights = class_weights;
   }
+  
+  // Setters for Batch Stratification
+  void setBatchIDs(const std::vector<uint>& batch_ids) {
+    this->sample_batchIDs = batch_ids;
+  }
+  void setBatchWeights(const std::vector<double>& batch_weights) {
+    this->batch_weights = batch_weights;
+  }
+  const std::vector<uint>& getBatchIDs() const {
+    return sample_batchIDs;
+  }
 
 protected:
   void initInternal() override;
@@ -65,6 +79,11 @@ protected:
 
   // Splitting weights
   std::vector<double> class_weights;
+  
+  // Members for Stratified Gini Index
+  std::vector<uint> sample_batchIDs;     // Vector of batch IDs (length = num_samples)
+  std::vector<double> batch_weights;     // Weights w_k for each batch k (length = K)
+  size_t num_batches{0};                 // Number of distinct batches K
 
 private:
   const std::vector<double>& getTreePrediction(size_t tree_idx, size_t sample_idx) const;
