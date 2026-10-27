@@ -162,7 +162,7 @@ Rcpp::List rangerCpp(uint treetype, Rcpp::NumericMatrix& input_x, Rcpp::NumericM
     }
     
     if (treetype == TREE_PROBABILITY && !batch_ids.empty()) {
-      auto& temp = dynamic_cast<ForestClassification&>(*forest);
+      auto& temp = dynamic_cast<ForestProbability&>(*forest);
       temp.setBatchIDs(batch_ids);
     }
 
