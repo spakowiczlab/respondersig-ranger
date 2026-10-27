@@ -7,6 +7,9 @@
 
  Please note that the C++ core of ranger is distributed under MIT license and the
  R package "ranger" under GPL3 license.
+ 
+ Edited by Caroline Dravillas to implement stratified gini index and 
+ Mantel-Haenszel for handling batch effects.
  #-------------------------------------------------------------------------------*/
 
 #ifndef TREEPROBABILITY_H_

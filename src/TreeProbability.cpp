@@ -288,30 +288,42 @@ void TreeProbability::findBestSplitValueSmallQ(size_t nodeID, size_t varID, size
     double& best_decrease, const std::vector<double>& possible_split_values, std::vector<size_t>& counter_per_class,
     std::vector<size_t>& counter) {
 
-  const size_t num_splits = possible_split_values.size();
-  size_t num_batches = batch_weights->size();
-  
-  // 2D counter for candidate split: (num_splits * num_batches * num_classes)
-  std::vector<size_t> counter_per_batch_class(num_splits * num_batches * num_classes, 0);
-  std::vector<std::vector<size_t>> parent_batch_counts(num_batches, std::vector<size_t>(num_classes, 0));
-  
-  for (size_t pos = start_pos[nodeID]; pos < end_pos[nodeID]; ++pos) {
-    size_t sampleID = sampleIDs[pos];
-    uint sample_classID = (*response_classIDs)[sampleID];
-    uint sample_batchID = (*sample_batchIDs)[sampleID]; // get sample batch
+    const size_t num_splits = possible_split_values.size();
+    // Guard: only compute num_batches if batch_weights is non-null
+    size_t num_batches = (batch_weights != nullptr) ? batch_weights->size() : 0;
     
-    size_t idx = std::lower_bound(possible_split_values.begin(), possible_split_values.end(),
-                                  data->get_x(sampleID, varID)) - possible_split_values.begin();
+    // Only allocated when batch info is available
+    std::vector<size_t> counter_per_batch_class;
+    std::vector<std::vector<size_t>> parent_batch_counts;
+    if (num_batches > 0) {
+      counter_per_batch_class.assign(num_splits * num_batches * num_classes, 0);
+      parent_batch_counts.assign(num_batches, std::vector<size_t>(num_classes, 0));
+    }
     
-    ++counter_per_batch_class[idx * (num_batches * num_classes) + sample_batchID * num_classes + sample_classID];
-    ++counter[idx];
-    ++parent_batch_counts[sample_batchID][sample_classID];
-  }
+    for (size_t pos = start_pos[nodeID]; pos < end_pos[nodeID]; ++pos) {
+      size_t sampleID = sampleIDs[pos];
+      uint sample_classID = (*response_classIDs)[sampleID];
+      
+      size_t idx = std::lower_bound(possible_split_values.begin(), possible_split_values.end(),
+                                    data->get_x(sampleID, varID)) - possible_split_values.begin();
+      
+      // Only populate batch counters when batch info is available
+      if (num_batches > 0) {
+        uint sample_batchID = (*sample_batchIDs)[sampleID];
+        ++counter_per_batch_class[idx * (num_batches * num_classes) + sample_batchID * num_classes + sample_classID];
+        ++parent_batch_counts[sample_batchID][sample_classID];
+      }
+      ++counter[idx];
+      ++counter_per_class[idx * num_classes + sample_classID];  // needed for HELLINGER + default
+    }
+    
+    size_t n_left = 0;
+    std::vector<size_t> class_counts_left(num_classes);
+    std::vector<std::vector<size_t>> class_counts_left_batch;
+    if (num_batches > 0) {
+      class_counts_left_batch.assign(num_batches, std::vector<size_t>(num_classes, 0));
+    }
   
-  size_t n_left = 0;
-  std::vector<size_t> class_counts_left(num_classes);
-  std::vector<std::vector<size_t>> class_counts_left_batch(num_batches, std::vector<size_t>(num_classes, 0));
-
   // Compute decrease of impurity for each split
   for (size_t i = 0; i < possible_split_values.size() - 1; ++i) {
 
@@ -487,34 +499,45 @@ void TreeProbability::findBestSplitValueLargeQ(size_t nodeID, size_t varID, size
     const std::vector<size_t>& class_counts, size_t num_samples_node, double& best_value, size_t& best_varID,
     double& best_decrease) {
 
-  // Set counters to 0
-  size_t num_unique = data->getNumUniqueDataValues(varID);
-  std::fill_n(counter_per_class.begin(), num_unique * num_classes, 0);
-  std::fill_n(counter.begin(), num_unique, 0);
-  
-  size_t num_batches = batch_weights->size();
-  
-  // 2D counter for candidate split: (num_unique * num_batches * num_classes)
-  std::vector<size_t> counter_per_batch_class(num_unique * num_batches * num_classes, 0);
-  std::vector<std::vector<size_t>> parent_batch_counts(num_batches, std::vector<size_t>(num_classes, 0));
-  
-  // Count values
-  for (size_t pos = start_pos[nodeID]; pos < end_pos[nodeID]; ++pos) {
-    size_t sampleID = sampleIDs[pos];
-    size_t index = data->getIndex(sampleID, varID);
-    uint sample_classID = (*response_classIDs)[sampleID];
-    uint sample_batchID = (*sample_batchIDs)[sampleID];
+    // Set counters to 0
+    size_t num_unique = data->getNumUniqueDataValues(varID);
+    std::fill_n(counter_per_class.begin(), num_unique * num_classes, 0);
+    std::fill_n(counter.begin(), num_unique, 0);
     
-    ++counter_per_batch_class[index * (num_batches * num_classes) + sample_batchID * num_classes + sample_classID];
-    ++counter[index];
-    ++counter_per_class[index * num_classes + sample_classID];
-    ++parent_batch_counts[sample_batchID][sample_classID];
-  }
+    // Guard: only compute num_batches if batch_weights is non-null
+    size_t num_batches = (batch_weights != nullptr) ? batch_weights->size() : 0;
+    
+    // Only allocated when batch info is available
+    std::vector<size_t> counter_per_batch_class;
+    std::vector<std::vector<size_t>> parent_batch_counts;
+    if (num_batches > 0) {
+      counter_per_batch_class.assign(num_unique * num_batches * num_classes, 0);
+      parent_batch_counts.assign(num_batches, std::vector<size_t>(num_classes, 0));
+    }
+    
+    // Count values
+    for (size_t pos = start_pos[nodeID]; pos < end_pos[nodeID]; ++pos) {
+      size_t sampleID = sampleIDs[pos];
+      size_t index = data->getIndex(sampleID, varID);
+      uint sample_classID = (*response_classIDs)[sampleID];
+      
+      ++counter[index];
+      ++counter_per_class[index * num_classes + sample_classID];
+      // Only populate batch counters when batch info is available
+      if (num_batches > 0) {
+        uint sample_batchID = (*sample_batchIDs)[sampleID];
+        ++counter_per_batch_class[index * (num_batches * num_classes) + sample_batchID * num_classes + sample_classID];
+        ++parent_batch_counts[sample_batchID][sample_classID];
+      }
+    }
+    
+    size_t n_left = 0;
+    std::vector<size_t> class_counts_left(num_classes);
+    std::vector<std::vector<size_t>> class_counts_left_batch;
+    if (num_batches > 0) {
+      class_counts_left_batch.assign(num_batches, std::vector<size_t>(num_classes, 0));
+    }
   
-  size_t n_left = 0;
-  std::vector<size_t> class_counts_left(num_classes);
-  std::vector<std::vector<size_t>> class_counts_left_batch(num_batches, std::vector<size_t>(num_classes, 0));
-
   // Compute decrease of impurity for each split
   for (size_t i = 0; i < num_unique - 1; ++i) {
 
