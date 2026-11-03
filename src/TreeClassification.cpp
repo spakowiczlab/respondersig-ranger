@@ -321,6 +321,18 @@ void TreeClassification::findBestSplitValueSmallQ(size_t nodeID, size_t varID, s
   size_t n_left = 0;
   std::vector<size_t> class_counts_left(num_classes);
   std::vector<std::vector<size_t>> class_counts_left_batch(num_batches, std::vector<size_t>(num_classes, 0));
+  
+  double gini_parent = 0.0;
+  if (splitrule == STRATIFIED_GINI && num_batches > 0) {
+    for (size_t k = 0; k < num_batches; ++k) {
+      size_t n_k = parent_batch_counts[k][0] + parent_batch_counts[k][1];
+      if (n_k > 0) {
+        double p_k = (double) parent_batch_counts[k][1] / (double) n_k;
+        double w_k = (*batch_weights)[k];
+        gini_parent += w_k * 2.0 * p_k * (1.0 - p_k);
+      }
+    }
+  }
 
   // Compute decrease of impurity for each split
   for (size_t i = 0; i < possible_split_values.size() - 1; ++i) {
@@ -399,7 +411,7 @@ void TreeClassification::findBestSplitValueSmallQ(size_t nodeID, size_t varID, s
       // Decrease = - weighted child impurity (maximizing reduction in impurity)
       double weighted_child_gini = ((double)n_left / num_samples_node) * gini_L +
                                    ((double)n_right / num_samples_node) * gini_R;
-      decrease = -weighted_child_gini;
+      decrease = gini_parent - weighted_child_gini;
       
     } else {
       // Sum of squares
@@ -482,6 +494,18 @@ void TreeClassification::findBestSplitValueLargeQ(size_t nodeID, size_t varID, s
     std::vector<size_t> class_counts_left(num_classes);
     std::vector<std::vector<size_t>> class_counts_left_batch(num_batches, std::vector<size_t>(num_classes, 0));
     
+    double gini_parent = 0.0;
+    if (splitrule == STRATIFIED_GINI && num_batches > 0) {
+      for (size_t k = 0; k < num_batches; ++k) {
+        size_t n_k = parent_batch_counts[k][0] + parent_batch_counts[k][1];
+        if (n_k > 0) {
+          double p_k = (double) parent_batch_counts[k][1] / (double) n_k;
+          double w_k = (*batch_weights)[k];
+          gini_parent += w_k * 2.0 * p_k * (1.0 - p_k);
+        }
+      }
+    }
+    
   // Compute decrease of impurity for each split
   for (size_t i = 0; i < num_unique - 1; ++i) {
 
@@ -560,7 +584,7 @@ void TreeClassification::findBestSplitValueLargeQ(size_t nodeID, size_t varID, s
       // Decrease = - weighted child impurity (maximizing reduction in impurity)
       double weighted_child_gini = ((double)n_left / num_samples_node) * gini_L +
         ((double)n_right / num_samples_node) * gini_R;
-      decrease = -weighted_child_gini;
+      decrease = gini_parent - weighted_child_gini;
       
     // new mantel-haenszel split logic
     // goal is to maximize the difference AKA largest test statistic
@@ -1395,7 +1419,7 @@ void TreeClassification::findBestSplitValueNanLargeQ(size_t nodeID, size_t varID
 void TreeClassification::addGiniImportance(size_t nodeID, size_t varID, double decrease) {
 
   double best_decrease = decrease;
-  if (splitrule != HELLINGER) {
+  if (splitrule != HELLINGER && splitrule != STRATIFIED_GINI && splitrule != MANTEL_HAENSZEL) {
     size_t num_samples_node = end_pos[nodeID] - start_pos[nodeID];
     std::vector<size_t> class_counts;
     class_counts.resize(class_values->size(), 0);
